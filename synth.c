@@ -59,6 +59,7 @@ void dac_set(uint16_t value) {
     spi_write16_blocking(spi_default, &msg, 1);
 }
 
+// test function that outputs a saw wave
 void dac_task() {
     if (value > 4095) {
         value = 0;
