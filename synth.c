@@ -11,6 +11,8 @@
 
 #define NUM_MUX 2
 
+#define NUM_DCO 4
+
 // function declarations
 void cv_task();
 void dac_init();
