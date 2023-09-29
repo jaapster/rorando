@@ -14,7 +14,8 @@
 #define BLINK_TIME 100000
 
 #define NUM_MUX 2
-#define NUM_VOICE 6
+#define NUM_DCO 4
+#define NUM_VOICE 2
 #define SAW 0
 #define TRI 1
 #define SIN 2
@@ -38,6 +39,8 @@ void init_pin(uint8_t pin);
 void led_init();
 void led_task();
 void lfo_task();
+void midi_init();
+void midi_task();
 void mux_init();
 void trigger_envelope(uint8_t voice);
 
@@ -48,10 +51,12 @@ const uint8_t mux_bit[3] = {PIN_CH_MUX_A, PIN_CH_MUX_B, PIN_CH_MUX_C};
 // system variables
 uint8_t cv_cursor = 0;
 uint16_t cv[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-uint16_t env_lvl[NUM_VOICE] = {0, 0, 0, 0, 0, 0};
-uint8_t env_phase[NUM_VOICE] = {0, 0, 0, 0, 0, 0};
-uint32_t env_tick[NUM_VOICE] = {0, 0, 0, 0, 0, 0};
+uint16_t env_lvl[NUM_VOICE] = {0, 0};
+uint8_t env_phase[NUM_VOICE] = {0, 0};
+uint32_t env_tick[NUM_VOICE] = {0, 0};
 uint32_t led_tick = 0;
+uint32_t lfo_del[NUM_VOICE] = {0, 0};
+uint32_t lfo_delay_tick = 0;
 uint16_t lfo_lvl = 0;
 uint32_t lfo_tick = 0;
 uint16_t lfo_val = 0;
@@ -62,7 +67,7 @@ uint16_t env_d = 200; // time in ms
 uint16_t env_s = 256; // level between 0 and RES
 uint16_t env_r = 1000; // time in ms
 float lfo_freq = 5; // hz
-uint8_t lfo_wav = SIN;
+uint8_t lfo_wav = SAW;
 uint32_t lfo_delay = 0;
 
 //
@@ -70,11 +75,13 @@ int main() {
     stdio_init_all();
     dac_init();
     led_init();
+    midi_init();
     mux_init();
 
     trigger_envelope(0);
 
     while (1) {
+        midi_task();
         env_task();
         lfo_task();
         cv_task();
@@ -116,10 +123,10 @@ void dac_set(uint16_t value) {
     spi_write16_blocking(spi_default, &msg, 1);
 }
 
-// test function that outputs the lfo
+// test function
 void dac_task() {
-    // lfo RES is 255 so multiply by 16 to get full dac range
-    dac_set(env_lvl[0] << 2);
+    int f = 4096 / RES;
+    dac_set(env_lvl[0] * f);
 }
 
 void env_task() {
@@ -143,7 +150,9 @@ void env_task() {
             }
 
             // initialize the first envelope tick
-            if (env_tick[i] == 0) env_tick[i] = tick - step;
+            if (env_tick[i] == 0) {
+                env_tick[i] = tick - step;
+            }
 
             // crude but probably good enough
             if (tick - env_tick[i] >= step) {
@@ -152,15 +161,21 @@ void env_task() {
                 if (phase == ATTACK) {
                     env_lvl[i] += 1;
 
-                    if (env_lvl[i] == RES) env_phase[i] = DECAY;
+                    if (env_lvl[i] == RES) {
+                        env_phase[i] = DECAY;
+                    }
                 } else if (phase == DECAY) {
                     env_lvl[i] -= 1;
 
-                    if (env_lvl[i] == env_s) env_phase[i] = SUSTAIN;
+                    if (env_lvl[i] == env_s) {
+                        env_phase[i] = SUSTAIN;
+                    }
                 } else if (phase == RELEASE) {
                     env_lvl[i] -= 1;
 
-                    if (env_lvl[i] == 0) env_phase[i] = IDLE;
+                    if (env_lvl[i] == 0) {
+                        env_phase[i] = IDLE;
+                    }
                 }
             }
         }
@@ -222,6 +237,14 @@ void lfo_task() {
             lfo_lvl = rand() % RES;
         }
     }
+}
+
+void midi_init() {
+
+}
+
+void midi_task() {
+
 }
 
 void mux_init() {
